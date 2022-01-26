@@ -144,8 +144,9 @@ public class PlayerController : MonoBehaviour
     {
         if (Input.GetAxis(fire1AxisName) != 0 && isGrounded)
         {
+            // TODO Remove debugs
             Debug.Log("Switching dimensions");
-            transform.position = currentWaypoint.transform.GetChild(0).position;
+            //transform.position = currentWaypoint.transform.GetChild(0).position;
             isTovSide = !isTovSide;
             isGrounded = !isGrounded;
             tovWorld.SetActive(isTovSide);
