@@ -17,15 +17,13 @@ public class PlayerController : MonoBehaviour
     [SerializeField] GameObject raWorld;
 
     // Tags
-    [SerializeField] private string waypointTag = "Waypoint";
-    [SerializeField] private string finalWaypointTag = "Final Waypoint";
-    [SerializeField] private string horizontalInputName = "Horizontal";
-    [SerializeField] private string verticalInputName = "Vertical";
-    [SerializeField] private string jumpInputName = "Jump";
-    [SerializeField] private string fire1AxisName = "Fire1";
-    [SerializeField] private string fire2AxisName = "Fire2";
-
-    float horizontalVelocity;
+    private string waypointTag = "Waypoint";
+    private string finalWaypointTag = "Final Waypoint";
+    private string horizontalInputName = "Horizontal";
+    private string verticalInputName = "Vertical";
+    private string jumpInputName = "Jump";
+    private string fire1AxisName = "Fire1";
+    private string fire2AxisName = "Fire2";
 
     // Status variables
     [SerializeField] bool isGrounded = false;
@@ -40,6 +38,10 @@ public class PlayerController : MonoBehaviour
     // Cache variables
     Rigidbody2D myRigidbody2D;
     EvolutionTracker myEvolutionTracker;
+    [SerializeField] BoxCollider2D myDownCollider2D;
+    [SerializeField] BoxCollider2D myUpCollider2D;
+    [SerializeField] BoxCollider2D myLeftCollider2D;
+    [SerializeField] BoxCollider2D myRightCollider2D;
 
     // Debug variables
     public float verticalInput;
@@ -59,9 +61,6 @@ public class PlayerController : MonoBehaviour
     private void Update()
     {
         ProcessJump();
-
-        // TODO Change speed calculations to allow for gradient of movement (not to stop/start immediately)
-        horizontalVelocity = 0;
 
         ProcessHorizontalMovement();
 
