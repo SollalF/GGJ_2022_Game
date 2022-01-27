@@ -10,6 +10,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] float dashSpeed = 1.0f;
     [SerializeField] float dashDistance = 1.0f;
     [SerializeField] float dashCooldown = 1.0f;
+    [SerializeField] float switchCooldown = 1.0f;
 
     public GameObject currentWaypoint;
     [SerializeField] GameObject tovWorld;
@@ -30,6 +31,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] bool isGrounded = false;
     public bool isTovSide { get; private set; } = true;
     private bool usedDash = false;
+    private float curSwitchCooldown;
     private float curDashCooldown;
     private float dashProgress;
     private Vector3 dashStart;
@@ -142,15 +144,19 @@ public class PlayerController : MonoBehaviour
 
     private void ProcessDimensionSwitch()
     {
-        if (Input.GetAxis(fire1AxisName) != 0 && isGrounded)
+        if (curSwitchCooldown <= 0)
         {
-            // TODO Remove debugs
-            Debug.Log("Switching dimensions");
-            //transform.position = currentWaypoint.transform.GetChild(0).position;
-            isTovSide = !isTovSide;
-            isGrounded = !isGrounded;
-            tovWorld.SetActive(isTovSide);
-            raWorld.SetActive(!isTovSide);
+            if (Input.GetAxisRaw(fire1AxisName) != 0)
+            {
+                curSwitchCooldown = switchCooldown;
+                isTovSide = !isTovSide;
+                tovWorld.SetActive(isTovSide);
+                raWorld.SetActive(!isTovSide);
+            }
+        }
+        else
+        {
+            curSwitchCooldown -= Time.deltaTime;
         }
     }
 
