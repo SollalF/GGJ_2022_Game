@@ -25,8 +25,10 @@ public class PlayerController : MonoBehaviour
     private string fire1AxisName = "Fire1";
     private string fire2AxisName = "Fire2";
     private string fire3AxisName = "Fire3";
-    private string groundLayerTag = "Ground";
+    private string groundLayerName = "Ground";
     private string damageLayerTag = "Damage";
+    private string tovSideTag = "TovSide";
+    private string raSideTag = "RaSide";
 
     // Status variables
     [SerializeField] bool isGrounded = false;
@@ -50,6 +52,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] BoxCollider2D myUpCollider2D;
     [SerializeField] BoxCollider2D myLeftCollider2D;
     [SerializeField] BoxCollider2D myRightCollider2D;
+    [SerializeField] BoxCollider2D myNonFeetCollider2D;
 
     // Debug variables
     public float horizontalVelocityDiff;
@@ -88,7 +91,7 @@ public class PlayerController : MonoBehaviour
                 isPeeking = !isPeeking;
                 foreach (Transform child in isTovSide ? raWorld.transform : tovWorld.transform)
                 {
-                    if (child.gameObject.layer == LayerMask.NameToLayer(groundLayerTag))
+                    if (child.gameObject.layer == LayerMask.NameToLayer(groundLayerName))
                     {
                         Color newColor = child.GetComponent<Tilemap>().color;
                         newColor.a = isPeeking ? peekingOpacity : 0f;
@@ -183,11 +186,65 @@ public class PlayerController : MonoBehaviour
         {
             if (fire1AxisInUse == false)
             {
-                Switch();
+                foreach (Transform child in isTovSide ? raWorld.transform : tovWorld.transform)
+                {
+                    if (child.gameObject.layer == LayerMask.NameToLayer(groundLayerName))
+                    {
+                        TilemapCollider2D tilemapCollider2D = child.GetComponent<TilemapCollider2D>();
+                        tilemapCollider2D.enabled = true;
+
+                        ContactFilter2D contactFilter2D = new ContactFilter2D();
+                        contactFilter2D.SetLayerMask(LayerMask.GetMask(groundLayerName));
+
+                        Collider2D[] mainColliderHits = new Collider2D[4];
+
+                        myRigidbody2D.OverlapCollider(contactFilter2D, mainColliderHits);
+
+                        bool collision = false;
+
+                        foreach (Collider2D mainHit in mainColliderHits)
+                        {
+
+                            if (mainHit == null)
+                            {
+                                break;
+                            }
+
+                            if (mainHit.gameObject.Equals(child.gameObject))
+                            {
+
+                                Collider2D[] nonFeetColliderHits = new Collider2D[4];
+
+                                myNonFeetCollider2D.OverlapCollider(contactFilter2D, nonFeetColliderHits);
+
+                                foreach (Collider2D nonFeetHit in nonFeetColliderHits)
+                                {
+                                    if (nonFeetHit == null)
+                                    {
+                                        break;
+                                    }
+                                    else if (nonFeetHit.gameObject.Equals(child.gameObject))
+                                    {
+                                        Debug.Log("Collided with: " + nonFeetHit.gameObject);
+                                        collision = true;
+                                        break;
+                                    }
+                                }
+                                
+                            }
+                        }
+
+                        tilemapCollider2D.enabled = false;
+                        if (!collision)
+                        {
+                            Switch();
+                        }
+                    }
+                }
                 fire1AxisInUse = true;
             }
         }
-        if (Input.GetAxisRaw("Fire1") == 0)
+        if (Input.GetAxisRaw(fire1AxisName) == 0)
         {
             fire1AxisInUse = false;
         }
@@ -202,9 +259,8 @@ public class PlayerController : MonoBehaviour
             Color newColor = child.GetComponent<Tilemap>().color;
             newColor.a = isTovSide ? 1 : 0;
             child.GetComponent<Tilemap>().color = newColor;
-            if (child.gameObject.layer == LayerMask.NameToLayer(groundLayerTag))
+            if (child.gameObject.layer == LayerMask.NameToLayer(groundLayerName) || child.gameObject.layer == LayerMask.NameToLayer(damageLayerTag))
             {
-                Debug.Log("removed collider from tovworld");
                 child.GetComponent<TilemapCollider2D>().enabled = isTovSide;
             }
         }
@@ -213,11 +269,18 @@ public class PlayerController : MonoBehaviour
             Color newColor = child.GetComponent<Tilemap>().color;
             newColor.a = !isTovSide ? 1 : 0;
             child.GetComponent<Tilemap>().color = newColor;
-            if (child.gameObject.layer == LayerMask.NameToLayer(groundLayerTag))
+            if (child.gameObject.layer == LayerMask.NameToLayer(groundLayerName) || child.gameObject.layer == LayerMask.NameToLayer(damageLayerTag))
             {
-                Debug.Log("removed collider from raworld");
                 child.GetComponent<TilemapCollider2D>().enabled = !isTovSide;
             }
+        }
+        if (myRigidbody2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)))
+        {
+            isGrounded = true;
+        }
+        else
+        {
+            isGrounded = false;
         }
     }
 
@@ -227,24 +290,24 @@ public class PlayerController : MonoBehaviour
         {
             if (Input.GetAxis(jumpInputName) > 0 && isGrounded)
             {
-                if (myDownCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerTag)))
+                if (myDownCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)))
                 {
                     myRigidbody2D.AddForce(new Vector3(0, jumpForce));
                     Debug.Log("Vertical jump " + myRigidbody2D.velocity);
                 }
-                else if (myLeftCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerTag)))
+                else if (myLeftCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)))
                 {
                     myRigidbody2D.velocity = new Vector3(0, myRigidbody2D.velocity.y);
                     myRigidbody2D.AddForce(new Vector3(jumpForce * Mathf.Sin(Mathf.PI * 0.25f), jumpForce * Mathf.Cos(Mathf.PI * 0.25f)));
                     Debug.Log("Right jump " + myRigidbody2D.velocity);
                 }
-                else if (myRightCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerTag)))
+                else if (myRightCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)))
                 {
                     myRigidbody2D.velocity = new Vector3(0, myRigidbody2D.velocity.y);
                     myRigidbody2D.AddForce(new Vector3(jumpForce * Mathf.Sin(Mathf.PI * -0.25f), jumpForce * Mathf.Cos(Mathf.PI * -0.25f)));
                     Debug.Log("Left jump" + myRigidbody2D.velocity);
                 }
-                else if (myUpCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerTag)))
+                else if (myUpCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)))
                 {
                     myRigidbody2D.gravityScale = 1;
                 }
@@ -260,10 +323,10 @@ public class PlayerController : MonoBehaviour
     private void ProcessHorizontalMovement()
     {
         horizontalInput = Input.GetAxis(horizontalInputName);
-        if (isGrounded && !myDownCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerTag))
-                && (((myRightCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerTag)) && horizontalInput == 1))
-                || (myLeftCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerTag)) && horizontalInput == -1)
-                || (myUpCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerTag)) && Input.GetAxisRaw(verticalInputName) == 1)))
+        if (isGrounded && !myDownCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName))
+                && (((myRightCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)) && horizontalInput == 1))
+                    || (myLeftCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)) && horizontalInput == -1)
+                    || (myUpCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)) && Input.GetAxisRaw(verticalInputName) == 1)))
         {
             myRigidbody2D.velocity = Vector3.zero;
             myRigidbody2D.gravityScale = 0;
