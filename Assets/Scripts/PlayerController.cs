@@ -10,7 +10,9 @@ public class PlayerController : MonoBehaviour
     [SerializeField] float dashSpeed = 1.0f;
     [SerializeField] float dashDistance = 1.0f;
     [SerializeField] float dashCooldown = 1.0f;
+    [SerializeField] float jumpCooldown = 0.1f;
     [SerializeField] float switchCooldown = 1.0f;
+    [SerializeField] float horizontalMovementSmoothingFactor = .05f;
 
     public GameObject currentWaypoint;
     [SerializeField] GameObject tovWorld;
@@ -24,6 +26,7 @@ public class PlayerController : MonoBehaviour
     private string jumpInputName = "Jump";
     private string fire1AxisName = "Fire1";
     private string fire2AxisName = "Fire2";
+    private string groundLayerTag = "Ground";
 
     // Status variables
     [SerializeField] bool isGrounded = false;
@@ -31,11 +34,18 @@ public class PlayerController : MonoBehaviour
     private bool usedDash = false;
     private float curSwitchCooldown;
     private float curDashCooldown;
+    private float curJumpCooldown;
     private float dashProgress;
     private Vector3 dashStart;
-    private Vector3 dashEnd;
+    private Vector3 dashHeading;
+    public float horizontalInput;
+    public float horizontalVelocity;
+    public float prevHorizontalVelocity;
+    private Vector3 curVelocity;
+
 
     // Cache variables
+    BoxCollider2D myBoxCollider2D;
     Rigidbody2D myRigidbody2D;
     EvolutionTracker myEvolutionTracker;
     [SerializeField] BoxCollider2D myDownCollider2D;
@@ -44,11 +54,11 @@ public class PlayerController : MonoBehaviour
     [SerializeField] BoxCollider2D myRightCollider2D;
 
     // Debug variables
-    public float verticalInput;
-    public float horizontalInput;
+    public float horizontalVelocityDiff;
 
     private void Start()
     {
+        myBoxCollider2D = GetComponent<BoxCollider2D>();
         myRigidbody2D = GetComponent<Rigidbody2D>();
         myEvolutionTracker = GetComponent<EvolutionTracker>();
         if(myEvolutionTracker == null) { Debug.LogWarning("Missing DistanceSinceSwitchTracker"); }
@@ -60,6 +70,11 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
+        ProcessMovements();
+    }
+
+    private void ProcessMovements()
+    {
         ProcessJump();
 
         ProcessHorizontalMovement();
@@ -67,10 +82,6 @@ public class PlayerController : MonoBehaviour
         ProcessDimensionSwitch();
 
         ProcessDash();
-
-        // TODO Remove debug variables
-        verticalInput = Input.GetAxisRaw(verticalInputName);
-        horizontalInput = Input.GetAxisRaw(horizontalInputName);
     }
 
     private void ProcessDash()
@@ -83,8 +94,8 @@ public class PlayerController : MonoBehaviour
                 dashProgress = 0;
                 curDashCooldown = dashCooldown;
                 dashStart = transform.position;
-                dashEnd = transform.position + ComputeHeading() * dashDistance;
-                Debug.DrawLine(dashStart, dashEnd, Color.red, 10f);
+                dashHeading = ComputeHeading();
+                Debug.DrawLine(dashStart, dashStart + dashHeading * dashDistance, Color.red, 10f);
             }
         }
         else
@@ -92,6 +103,11 @@ public class PlayerController : MonoBehaviour
             dashProgress += Time.deltaTime * dashSpeed;
             if (dashProgress >= 1)
             {
+                if (curDashCooldown == dashCooldown)
+                {
+                    myRigidbody2D.velocity = dashHeading * dashSpeed;
+                    Debug.DrawRay(transform.position, dashHeading, Color.green, 10f);
+                }
                 if (curDashCooldown <= 0 && isGrounded)
                 {
                     usedDash = !usedDash;
@@ -103,7 +119,7 @@ public class PlayerController : MonoBehaviour
             }
             else
             {
-                myRigidbody2D.MovePosition(Vector3.Lerp(dashStart, dashEnd, dashProgress));
+                myRigidbody2D.MovePosition(Vector3.Lerp(dashStart, dashStart + dashHeading * dashDistance, dashProgress));
             }
         }
     }
@@ -161,17 +177,60 @@ public class PlayerController : MonoBehaviour
 
     private void ProcessJump()
     {
-        // Jumping
-        if (Input.GetAxis(jumpInputName) > 0 && isGrounded)
+        if (curJumpCooldown <=0)
         {
-            GetComponent<Rigidbody2D>().velocity = new Vector3(myRigidbody2D.velocity.x, jumpForce);
+            if (Input.GetAxis(jumpInputName) > 0 && isGrounded)
+            {
+                if (myDownCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerTag)))
+                {
+                    myRigidbody2D.AddForce(new Vector3(0, jumpForce));
+                    Debug.Log("Vertical jump " + myRigidbody2D.velocity);
+                }
+                else if (myLeftCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerTag)))
+                {
+                    myRigidbody2D.velocity = new Vector3(0, myRigidbody2D.velocity.y);
+                    myRigidbody2D.AddForce(new Vector3(jumpForce * Mathf.Sin(Mathf.PI * 0.25f), jumpForce * Mathf.Cos(Mathf.PI * 0.25f)));
+                    Debug.Log("Right jump " + myRigidbody2D.velocity);
+                }
+                else if (myRightCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerTag)))
+                {
+                    myRigidbody2D.velocity = new Vector3(0, myRigidbody2D.velocity.y);
+                    myRigidbody2D.AddForce(new Vector3(jumpForce * Mathf.Sin(Mathf.PI * -0.25f), jumpForce * Mathf.Cos(Mathf.PI * -0.25f)));
+                    Debug.Log("Left jump" + myRigidbody2D.velocity);
+                }
+                else if (myUpCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerTag)))
+                {
+                    myRigidbody2D.gravityScale = 1;
+                }
+                curJumpCooldown = jumpCooldown;
+            }
+        }
+        else
+        {
+            curJumpCooldown -= Time.deltaTime;
         }
     }
 
     private void ProcessHorizontalMovement()
     {
-        float horizontalVelocity = Input.GetAxis(horizontalInputName) * runSpeed;
-        GetComponent<Rigidbody2D>().velocity = new Vector3(horizontalVelocity, myRigidbody2D.velocity.y);
+        horizontalInput = Input.GetAxis(horizontalInputName);
+        if (isGrounded && !myDownCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerTag))
+                && (((myRightCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerTag)) && horizontalInput == 1))
+                || (myLeftCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerTag)) && horizontalInput == -1)
+                || (myUpCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerTag)) && Input.GetAxisRaw(verticalInputName) == 1)))
+        {
+            myRigidbody2D.velocity = Vector3.zero;
+            myRigidbody2D.gravityScale = 0;
+        }
+        else if (horizontalInput != 0 && curJumpCooldown <= 0)
+        {
+            myRigidbody2D.gravityScale = 1;
+            myRigidbody2D.velocity = Vector3.SmoothDamp(myRigidbody2D.velocity, new Vector3(horizontalInput * runSpeed, myRigidbody2D.velocity.y), ref curVelocity, horizontalMovementSmoothingFactor);
+        }
+        else
+        {
+            myRigidbody2D.gravityScale = 1;
+        }
     }
 
     // Check if Grounded
@@ -184,6 +243,7 @@ public class PlayerController : MonoBehaviour
 
     private void OnCollisionExit2D(Collision2D collision)
     {
+        myRigidbody2D.gravityScale = 1;
         isGrounded = false;
     }
 
