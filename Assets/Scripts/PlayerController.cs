@@ -13,14 +13,12 @@ public class PlayerController : MonoBehaviour
     [SerializeField] float switchCooldown = 1.0f;
     [SerializeField] float horizontalMovementSmoothingFactor = .05f;
     [SerializeField] float peekingOpacity = .5f;
+    [SerializeField] Transform spawnPoint;
 
-    public GameObject currentWaypoint;
     [SerializeField] GameObject tovWorld;
     [SerializeField] GameObject raWorld;
 
     // Tags
-    private string waypointTag = "Waypoint";
-    private string finalWaypointTag = "Final Waypoint";
     private string horizontalInputName = "Horizontal";
     private string verticalInputName = "Vertical";
     private string jumpInputName = "Jump";
@@ -59,7 +57,6 @@ public class PlayerController : MonoBehaviour
     private void Start()
     {
         myRigidbody2D = GetComponent<Rigidbody2D>();
-        if (currentWaypoint == null) { Debug.LogWarning("Missing waypoint"); }
         Switch();
     }
 
@@ -289,7 +286,7 @@ public class PlayerController : MonoBehaviour
     {
         if (collision.collider.gameObject.layer == LayerMask.NameToLayer(damageLayerTag))
         {
-            transform.position = currentWaypoint.transform.position;
+            transform.position = spawnPoint.position;
         }
         isGrounded = true;
     }
@@ -302,14 +299,6 @@ public class PlayerController : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        if (collision.gameObject.tag == waypointTag && collision.gameObject.transform.position.x > currentWaypoint.transform.position.x)
-        {
-            currentWaypoint = collision.gameObject;
-        }
 
-        if (collision.gameObject.tag == finalWaypointTag)
-        {
-            Debug.Log("Game Over");
-        }
     }
 }
