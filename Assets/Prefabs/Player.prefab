@@ -44,7 +44,7 @@ BoxCollider2D:
   m_IsTrigger: 1
   m_UsedByEffector: 0
   m_UsedByComposite: 0
-  m_Offset: {x: 0, y: 0.6}
+  m_Offset: {x: 0, y: 0.5}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0, y: 0}
@@ -149,7 +149,6 @@ GameObject:
   m_Component:
   - component: {fileID: 3418789564567539107}
   - component: {fileID: 3418789564567539108}
-  - component: {fileID: 3418789564567539109}
   - component: {fileID: 3418789564567539105}
   - component: {fileID: 3418789564567539106}
   m_Layer: 0
@@ -191,12 +190,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   runSpeed: 7.5
-  jumpForce: 8.5
+  jumpForce: 400
   dashSpeed: 7
   dashDistance: 2.8
   dashCooldown: 0.5
   jumpCooldown: 0.25
   switchCooldown: 1
+  horizontalMovementSmoothingFactor: 0.05
+  peekingOpacity: 0.5
   currentWaypoint: {fileID: 0}
   tovWorld: {fileID: 0}
   raWorld: {fileID: 0}
@@ -205,21 +206,7 @@ MonoBehaviour:
   myUpCollider2D: {fileID: 2858605268259381500}
   myLeftCollider2D: {fileID: 723875719331202024}
   myRightCollider2D: {fileID: 3358602279276721859}
-  verticalInput: 0
---- !u!114 &3418789564567539109
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3418789564567539110}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d59b04364e132944894a26a461493cdd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  evolutionSpeed: 1
-  lastSwitchWaypoint: {fileID: 0}
+  horizontalVelocityDiff: 0
 --- !u!61 &3418789564567539105
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -311,7 +298,7 @@ BoxCollider2D:
   m_IsTrigger: 1
   m_UsedByEffector: 0
   m_UsedByComposite: 0
-  m_Offset: {x: 0, y: -0.6}
+  m_Offset: {x: 0, y: -0.5}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0, y: 0}
@@ -368,7 +355,7 @@ BoxCollider2D:
   m_IsTrigger: 1
   m_UsedByEffector: 0
   m_UsedByComposite: 0
-  m_Offset: {x: 0.6, y: 0}
+  m_Offset: {x: 0.5, y: 0}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0, y: 0}
@@ -425,7 +412,7 @@ BoxCollider2D:
   m_IsTrigger: 1
   m_UsedByEffector: 0
   m_UsedByComposite: 0
-  m_Offset: {x: -0.6, y: 0}
+  m_Offset: {x: -0.5, y: 0}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0, y: 0}

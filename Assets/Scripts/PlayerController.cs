@@ -1,6 +1,5 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 public class PlayerController : MonoBehaviour
 {
@@ -13,6 +12,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] float jumpCooldown = 0.1f;
     [SerializeField] float switchCooldown = 1.0f;
     [SerializeField] float horizontalMovementSmoothingFactor = .05f;
+    [SerializeField] float peekingOpacity = .5f;
 
     public GameObject currentWaypoint;
     [SerializeField] GameObject tovWorld;
@@ -26,28 +26,28 @@ public class PlayerController : MonoBehaviour
     private string jumpInputName = "Jump";
     private string fire1AxisName = "Fire1";
     private string fire2AxisName = "Fire2";
+    private string fire3AxisName = "Fire3";
     private string groundLayerTag = "Ground";
+    private string damageLayerTag = "Damage";
 
     // Status variables
     [SerializeField] bool isGrounded = false;
     public bool isTovSide { get; private set; } = true;
     private bool usedDash = false;
-    private float curSwitchCooldown;
+    private bool isPeeking = false;
+    private bool fire3AxisInUse = false;
+    private bool fire1AxisInUse = false;
     private float curDashCooldown;
     private float curJumpCooldown;
     private float dashProgress;
     private Vector3 dashStart;
     private Vector3 dashHeading;
-    public float horizontalInput;
-    public float horizontalVelocity;
-    public float prevHorizontalVelocity;
+    private float horizontalInput;
     private Vector3 curVelocity;
 
 
     // Cache variables
-    BoxCollider2D myBoxCollider2D;
     Rigidbody2D myRigidbody2D;
-    EvolutionTracker myEvolutionTracker;
     [SerializeField] BoxCollider2D myDownCollider2D;
     [SerializeField] BoxCollider2D myUpCollider2D;
     [SerializeField] BoxCollider2D myLeftCollider2D;
@@ -58,14 +58,9 @@ public class PlayerController : MonoBehaviour
 
     private void Start()
     {
-        myBoxCollider2D = GetComponent<BoxCollider2D>();
         myRigidbody2D = GetComponent<Rigidbody2D>();
-        myEvolutionTracker = GetComponent<EvolutionTracker>();
-        if(myEvolutionTracker == null) { Debug.LogWarning("Missing DistanceSinceSwitchTracker"); }
         if (currentWaypoint == null) { Debug.LogWarning("Missing waypoint"); }
-        tovWorld.SetActive(isTovSide);
-        raWorld.SetActive(!isTovSide);
-        
+        Switch();
     }
 
     private void Update()
@@ -79,9 +74,37 @@ public class PlayerController : MonoBehaviour
 
         ProcessHorizontalMovement();
 
+        ProcessPeek();
+
         ProcessDimensionSwitch();
 
         ProcessDash();
+    }
+
+    private void ProcessPeek()
+    {
+        // TODO change the render layer so that the image is always in front/back of the real world
+        if (Input.GetAxisRaw(fire3AxisName) != 0)
+        {
+            if (fire3AxisInUse == false)
+            {
+                isPeeking = !isPeeking;
+                foreach (Transform child in isTovSide ? raWorld.transform : tovWorld.transform)
+                {
+                    if (child.gameObject.layer == LayerMask.NameToLayer(groundLayerTag))
+                    {
+                        Color newColor = child.GetComponent<Tilemap>().color;
+                        newColor.a = isPeeking ? peekingOpacity : 0f;
+                        child.GetComponent<Tilemap>().color = newColor;
+                    }
+                }
+                fire3AxisInUse = true;
+            }
+        }
+        if (Input.GetAxisRaw(fire3AxisName) == 0)
+        {
+            fire3AxisInUse = false;
+        }
     }
 
     private void ProcessDash()
@@ -159,25 +182,51 @@ public class PlayerController : MonoBehaviour
 
     private void ProcessDimensionSwitch()
     {
-        if (curSwitchCooldown <= 0)
+        if (Input.GetAxisRaw(fire1AxisName) != 0)
         {
-            if (Input.GetAxisRaw(fire1AxisName) != 0)
+            if (fire1AxisInUse == false)
             {
-                curSwitchCooldown = switchCooldown;
-                isTovSide = !isTovSide;
-                tovWorld.SetActive(isTovSide);
-                raWorld.SetActive(!isTovSide);
+                Switch();
+                fire1AxisInUse = true;
             }
         }
-        else
+        if (Input.GetAxisRaw("Fire1") == 0)
         {
-            curSwitchCooldown -= Time.deltaTime;
+            fire1AxisInUse = false;
+        }
+    }
+
+    private void Switch()
+    {
+        isPeeking = false;
+        isTovSide = !isTovSide;
+        foreach (Transform child in tovWorld.transform)
+        {
+            Color newColor = child.GetComponent<Tilemap>().color;
+            newColor.a = isTovSide ? 1 : 0;
+            child.GetComponent<Tilemap>().color = newColor;
+            if (child.gameObject.layer == LayerMask.NameToLayer(groundLayerTag))
+            {
+                Debug.Log("removed collider from tovworld");
+                child.GetComponent<TilemapCollider2D>().enabled = isTovSide;
+            }
+        }
+        foreach (Transform child in raWorld.transform)
+        {
+            Color newColor = child.GetComponent<Tilemap>().color;
+            newColor.a = !isTovSide ? 1 : 0;
+            child.GetComponent<Tilemap>().color = newColor;
+            if (child.gameObject.layer == LayerMask.NameToLayer(groundLayerTag))
+            {
+                Debug.Log("removed collider from raworld");
+                child.GetComponent<TilemapCollider2D>().enabled = !isTovSide;
+            }
         }
     }
 
     private void ProcessJump()
     {
-        if (curJumpCooldown <=0)
+        if (curJumpCooldown <= 0)
         {
             if (Input.GetAxis(jumpInputName) > 0 && isGrounded)
             {
@@ -238,6 +287,10 @@ public class PlayerController : MonoBehaviour
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
+        if (collision.collider.gameObject.layer == LayerMask.NameToLayer(damageLayerTag))
+        {
+            transform.position = currentWaypoint.transform.position;
+        }
         isGrounded = true;
     }
 

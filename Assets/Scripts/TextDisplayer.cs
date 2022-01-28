@@ -12,7 +12,6 @@ public class TextDisplayer : MonoBehaviour
 
     public int lastTextOutput { get; set; } = 0;
 
-    EvolutionTracker myEvolutionTracker;
 
     // Cache variables
     PlayerController myPlayerController;
@@ -21,13 +20,11 @@ public class TextDisplayer : MonoBehaviour
     void Start()
     {
         myPlayerController = GetComponent<PlayerController>();
-        myEvolutionTracker = GetComponent<EvolutionTracker>();   
     }
 
     // Update is called once per frame
     void Update()
     {
-        if(myEvolutionTracker.evolutionLevel > distanceForTextsOutputs[lastTextOutput])
         {
             Debug.Log(myPlayerController.isTovSide ? topsideText[lastTextOutput++] : botsideText[lastTextOutput++]);
         }
