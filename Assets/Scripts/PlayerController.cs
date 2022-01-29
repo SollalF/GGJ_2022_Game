@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using UnityEngine.InputSystem;
+using System.Collections;
 
 public class PlayerController : MonoBehaviour
 {
@@ -9,8 +11,6 @@ public class PlayerController : MonoBehaviour
     [SerializeField] float dashSpeed = 1.0f;
     [SerializeField] float dashDistance = 1.0f;
     [SerializeField] float dashCooldown = 1.0f;
-    [SerializeField] float jumpCooldown = 0.1f;
-    [SerializeField] float switchCooldown = 1.0f;
     [SerializeField] float horizontalMovementSmoothingFactor = .05f;
     [SerializeField] float peekingOpacity = .5f;
     [SerializeField] Transform spawnPoint;
@@ -19,12 +19,6 @@ public class PlayerController : MonoBehaviour
     [SerializeField] GameObject raWorld;
 
     // Tags
-    private string horizontalInputName = "Horizontal";
-    private string verticalInputName = "Vertical";
-    private string jumpInputName = "Jump";
-    private string fire1AxisName = "Fire1";
-    private string fire2AxisName = "Fire2";
-    private string fire3AxisName = "Fire3";
     private string groundLayerName = "Ground";
     private string damageLayerTag = "Damage";
     private string tovSideTag = "TovSide";
@@ -38,18 +32,16 @@ public class PlayerController : MonoBehaviour
 
     // Status variables
     [SerializeField] bool isGrounded = false;
-    public bool isTovSide { get; private set; } = true;
+    public bool isTovSide { get; private set; } = false;
+    
     private bool usedDash = false;
     private bool isPeeking = false;
-    private bool fire3AxisInUse = false;
-    private bool fire1AxisInUse = false;
-    private float curDashCooldown;
-    private float curJumpCooldown;
-    private float dashProgress;
+
+    private float nextDashAvaliable = -1f;
+    private float nextJumpAvaliable = -1f;
+
     private bool isFacingRight = true;
-    private Vector3 dashStart;
-    private Vector3 dashHeading;
-    public float horizontalInput;
+    InputAction horizontalInput;
     private Vector3 curVelocity;
 
 
@@ -57,11 +49,40 @@ public class PlayerController : MonoBehaviour
     Rigidbody2D myRigidbody2D;
     LevelLoader myLevelLoader;
     Animator myAnimator;
+    InputMaster myInputMaster;
     [SerializeField] BoxCollider2D myDownCollider2D;
     [SerializeField] BoxCollider2D myUpCollider2D;
     [SerializeField] BoxCollider2D myBackCollider2D;
     [SerializeField] BoxCollider2D myFrontCollider2D;
     [SerializeField] CapsuleCollider2D mySmallCollider2D;
+
+    private void Awake()
+    {
+        myInputMaster = new InputMaster();
+    }
+
+    private void OnEnable()
+    {
+        horizontalInput = myInputMaster.Player.HorizontalMove;
+        horizontalInput.Enable();
+
+        myInputMaster.Player.Jump.performed += ctx => ProcessJump();
+        myInputMaster.Player.Jump.Enable();
+
+        myInputMaster.Player.Dash.performed += ctx => ProcessDash();
+        myInputMaster.Player.Dash.Enable();
+
+        myInputMaster.Player.Switch.performed += ctx => ProcessSwitch();
+        myInputMaster.Player.Switch.Enable();
+        
+        myInputMaster.Player.Peek.performed += ctx => ProcessPeek();
+        myInputMaster.Player.Peek.Enable();
+    }
+
+    private void OnDisable()
+    {
+        myInputMaster.Disable();
+    }
 
     private void Start()
     {
@@ -71,182 +92,113 @@ public class PlayerController : MonoBehaviour
         Switch();
     }
 
-    private void Update()
+    private void FixedUpdate()
     {
-        ProcessMovements();
-
-        // TODO move this outside of update
-        myAnimator.SetBool(jumpVar, !isGrounded);
-    }
-
-    private void ProcessMovements()
-    {
-        ProcessJump();
-
         ProcessHorizontalInput();
 
-        ProcessPeek();
-
-        ProcessDimensionSwitch();
-
-        ProcessDash();
+        if (Time.time >= nextDashAvaliable)
+        {
+            usedDash = false;
+        }
     }
-
     private void ProcessPeek()
     {
         // TODO change the render layer so that the image is always in front/back of the real world
-        if (Input.GetAxisRaw(fire3AxisName) != 0)
+        isPeeking = !isPeeking;
+        foreach (Transform child in isTovSide ? raWorld.transform : tovWorld.transform)
         {
-            if (fire3AxisInUse == false)
+            if (child.gameObject.layer == LayerMask.NameToLayer(groundLayerName))
             {
-                isPeeking = !isPeeking;
-                foreach (Transform child in isTovSide ? raWorld.transform : tovWorld.transform)
-                {
-                    if (child.gameObject.layer == LayerMask.NameToLayer(groundLayerName))
-                    {
-                        Color newColor = child.GetComponent<Tilemap>().color;
-                        newColor.a = isPeeking ? peekingOpacity : 0f;
-                        child.GetComponent<Tilemap>().color = newColor;
-                    }
-                }
-                fire3AxisInUse = true;
+                Color newColor = child.GetComponent<Tilemap>().color;
+                newColor.a = isPeeking ? peekingOpacity : 0f;
+                child.GetComponent<Tilemap>().color = newColor;
             }
         }
-        if (Input.GetAxisRaw(fire3AxisName) == 0)
+    }
+
+    private IEnumerator Dash()
+    {
+        myAnimator.SetBool(dashVar, true);
+
+        nextDashAvaliable = Time.time + dashDistance / dashSpeed + dashCooldown;
+        
+        usedDash = true;
+        
+        float dashProgress = 0;
+
+        Vector3 dashStart = transform.position;
+
+        Vector3 dashHeading = Vector3.right * horizontalInput.ReadValue<float>();
+
+        Debug.DrawLine(dashStart, dashStart + dashHeading * dashDistance, Color.red, 10f);
+
+        while(dashProgress < 1)
         {
-            fire3AxisInUse = false;
+            dashProgress += Time.deltaTime * dashSpeed;
+            myRigidbody2D.MovePosition(Vector3.Lerp(dashStart, dashStart + dashHeading * dashDistance, dashProgress));
+            yield return new WaitForEndOfFrame();
         }
+
+        dashProgress = 1;
+        myRigidbody2D.MovePosition(Vector3.Lerp(dashStart, dashStart + dashHeading * dashDistance, dashProgress));
+
+        myAnimator.SetBool(dashVar, false);
+        
+        myRigidbody2D.velocity = dashHeading * dashSpeed;
+        
+        Debug.DrawRay(transform.position, dashHeading, Color.green, 10f);
     }
 
     private void ProcessDash()
     {
-        if (!usedDash)
+        if (!usedDash && Time.time >= nextDashAvaliable)
         {
-            if (Input.GetAxisRaw(fire2AxisName) != 0)
-            {
-                myAnimator.SetBool(dashVar, true);
-                usedDash = !usedDash;
-                dashProgress = 0;
-                curDashCooldown = dashCooldown;
-                dashStart = transform.position;
-                dashHeading = ComputeHeading();
-                Debug.DrawLine(dashStart, dashStart + dashHeading * dashDistance, Color.red, 10f);
-            }
-        }
-        else
-        {
-            dashProgress += Time.deltaTime * dashSpeed;
-            if (dashProgress >= 1)
-            {
-                if (curDashCooldown == dashCooldown)
-                {
-                    myAnimator.SetBool(dashVar, false);
-                    myRigidbody2D.velocity = dashHeading * dashSpeed;
-                    Debug.DrawRay(transform.position, dashHeading, Color.green, 10f);
-                }
-                if (curDashCooldown <= 0 && isGrounded)
-                {
-                    usedDash = !usedDash;
-                }
-                else
-                {
-                    curDashCooldown -= Time.deltaTime;
-                }
-            }
-            else
-            {
-                myRigidbody2D.MovePosition(Vector3.Lerp(dashStart, dashStart + dashHeading * dashDistance, dashProgress));
-            }
+            StartCoroutine(Dash());
         }
     }
-
-    private Vector3 ComputeHeading()
+    private void ProcessSwitch()
     {
-        float heading = Mathf.Atan(Input.GetAxisRaw(horizontalInputName) / Input.GetAxisRaw(verticalInputName));
-
-        if (Input.GetAxisRaw(verticalInputName) == 0)
+        foreach (Transform child in isTovSide ? raWorld.transform : tovWorld.transform)
         {
-            if (Input.GetAxisRaw(horizontalInputName) > 0)
+            if (child.gameObject.layer == LayerMask.NameToLayer(groundLayerName))
             {
-                heading = Mathf.PI * 0.5f;
-            }
-            else if (Input.GetAxisRaw(horizontalInputName) < 0)
-            {
-                heading = Mathf.PI * -0.5F;
-            }
-            else
-            {
-                heading = Mathf.PI * 0.5f;
-            }
-        }
-        else if (Input.GetAxisRaw(horizontalInputName) == 0 && Input.GetAxisRaw(verticalInputName) == -1)
-        {
-            heading = Mathf.PI;
-        }
-        else if (Input.GetAxisRaw(verticalInputName) < 1)
-        {
-            heading -= Mathf.PI * Mathf.Sign(heading);
-        }
+                TilemapCollider2D tilemapCollider2D = child.GetComponent<TilemapCollider2D>();
+                tilemapCollider2D.enabled = true;
 
-        Vector3 direction = new Vector3(Mathf.Sin(heading), Mathf.Cos(heading));
+                ContactFilter2D contactFilter2D = new ContactFilter2D();
+                contactFilter2D.SetLayerMask(LayerMask.GetMask(groundLayerName));
 
-        return direction;
-    }
+                Collider2D[] smallColliderHits = new Collider2D[4];
 
-    private void ProcessDimensionSwitch()
-    {
-        if (Input.GetAxisRaw(fire1AxisName) != 0)
-        {
-            if (fire1AxisInUse == false)
-            {
-                foreach (Transform child in isTovSide ? raWorld.transform : tovWorld.transform)
+                mySmallCollider2D.OverlapCollider(contactFilter2D, smallColliderHits);
+
+                bool collision = false;
+
+                foreach (Collider2D Hit in smallColliderHits)
                 {
-                    if (child.gameObject.layer == LayerMask.NameToLayer(groundLayerName))
+
+                    if (Hit == null)
                     {
-                        TilemapCollider2D tilemapCollider2D = child.GetComponent<TilemapCollider2D>();
-                        tilemapCollider2D.enabled = true;
+                        break;
+                    }
 
-                        ContactFilter2D contactFilter2D = new ContactFilter2D();
-                        contactFilter2D.SetLayerMask(LayerMask.GetMask(groundLayerName));
+                    if (Hit.gameObject.Equals(child.gameObject))
+                    {
 
-                        Collider2D[] smallColliderHits = new Collider2D[4];
+                        collision = true;
 
-                        mySmallCollider2D.OverlapCollider(contactFilter2D, smallColliderHits);
-
-                        bool collision = false;
-
-                        foreach (Collider2D Hit in smallColliderHits)
-                        {
-
-                            if (Hit == null)
-                            {
-                                break;
-                            }
-
-                            if (Hit.gameObject.Equals(child.gameObject))
-                            {
-
-                                collision = true;
-                                
-                            }
-                        }
-
-                        tilemapCollider2D.enabled = false;
-                        if (!collision)
-                        {
-                            Switch();
-                        }
                     }
                 }
-                fire1AxisInUse = true;
+
+                tilemapCollider2D.enabled = false;
+                if (!collision)
+                {
+                    Switch();
+                }
             }
         }
-        if (Input.GetAxisRaw(fire1AxisName) == 0)
-        {
-            fire1AxisInUse = false;
-        }
     }
-
+    
     private void Switch()
     {
         isPeeking = false;
@@ -271,60 +223,45 @@ public class PlayerController : MonoBehaviour
                 child.GetComponent<TilemapCollider2D>().enabled = !isTovSide;
             }
         }
-        if (myRigidbody2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)))
-        {
-            isGrounded = true;
-        }
-        else
-        {
-            isGrounded = false;
-        }
     }
-
     private void ProcessJump()
     {
-        if (curJumpCooldown <= 0)
+        if (isGrounded)
         {
-            if (Input.GetAxis(jumpInputName) > 0 && isGrounded)
+            if (myDownCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)))
             {
-                if (myDownCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)))
-                {
-                    myRigidbody2D.AddForce(new Vector3(0, jumpForce));
-                }
-                else if (myFrontCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)))
-                {
-                    myRigidbody2D.velocity = new Vector3(0, myRigidbody2D.velocity.y);
-                    myRigidbody2D.AddForce(new Vector3(jumpForce * Mathf.Sin(Mathf.PI * (isFacingRight ? -0.25f : 0.25f)), jumpForce * Mathf.Cos(Mathf.PI * (isFacingRight ? -0.25f : 0.25f))));
-                }
-                else if (myUpCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)))
-                {
-                    myRigidbody2D.gravityScale = 1;
-                }
-
-                curJumpCooldown = jumpCooldown;
+                myRigidbody2D.AddForce(new Vector3(0, jumpForce));
+            }
+            else if (myFrontCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)))
+            {
+                myRigidbody2D.velocity = new Vector3(0, myRigidbody2D.velocity.y);
+                myRigidbody2D.AddForce(new Vector3(jumpForce * Mathf.Sin(Mathf.PI * (isFacingRight ? -0.25f : 0.25f)), jumpForce * Mathf.Cos(Mathf.PI * (isFacingRight ? -0.25f : 0.25f))));
             }
         }
-        else
-        {
-            curJumpCooldown -= Time.deltaTime;
-        }
     }
-
+    
     private void ProcessHorizontalInput()
     {
-        horizontalInput = Input.GetAxis(horizontalInputName);
+        float input = horizontalInput.ReadValue<float>();
         if (isGrounded && !myDownCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)) && myFrontCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)))
         {
             myAnimator.SetBool(grabVar, true);
             myRigidbody2D.velocity = Vector3.zero;
             myRigidbody2D.gravityScale = 0;
         }
-        else if (horizontalInput != 0)
+        else if (input != 0)
         {
             myAnimator.SetBool(grabVar, false);
             myAnimator.SetBool(runVar, true);
             myRigidbody2D.gravityScale = 1;
-            myRigidbody2D.velocity = Vector3.SmoothDamp(myRigidbody2D.velocity, new Vector3(horizontalInput * runSpeed, myRigidbody2D.velocity.y), ref curVelocity, horizontalMovementSmoothingFactor);
+            myRigidbody2D.velocity = Vector3.SmoothDamp(myRigidbody2D.velocity, new Vector3(input * runSpeed, myRigidbody2D.velocity.y), ref curVelocity, horizontalMovementSmoothingFactor);
+        }
+        else if (isGrounded)
+        {
+            myRigidbody2D.velocity = Vector3.SmoothDamp(myRigidbody2D.velocity, new Vector3( 0 , myRigidbody2D.velocity.y), ref curVelocity, horizontalMovementSmoothingFactor);
+            myAnimator.SetBool(grabVar, false);
+            myAnimator.SetBool(runVar, false);
+            myRigidbody2D.gravityScale = 1;
         }
         else
         {
@@ -332,32 +269,40 @@ public class PlayerController : MonoBehaviour
             myAnimator.SetBool(runVar, false);
             myRigidbody2D.gravityScale = 1;
         }
-        if (horizontalInput > 0 && !isFacingRight)
+        if (input > 0 && !isFacingRight)
         {
             Flip();
         }
-        else if (horizontalInput < 0 && isFacingRight)
+        else if (input < 0 && isFacingRight)
         {
             Flip();
         }
     }
-
-    // Check if Grounded
-    // TODO check if the trigger is ground and not wall or ceiling
-
+    
     private void OnCollisionEnter2D(Collision2D collision)
     {
         if (collision.collider.gameObject.layer == LayerMask.NameToLayer(damageLayerTag))
         {
             transform.position = spawnPoint.position;
         }
-        isGrounded = true;
+
+        if (collision.collider.gameObject.layer == LayerMask.NameToLayer(groundLayerName))
+        {
+            isGrounded = true;
+            myAnimator.SetBool(jumpVar, !isGrounded);
+        }
+
     }
 
     private void OnCollisionExit2D(Collision2D collision)
     {
         myRigidbody2D.gravityScale = 1;
-        isGrounded = false;
+
+        if (collision.collider.gameObject.layer == LayerMask.NameToLayer(groundLayerName))
+        {
+            isGrounded = false;
+            myAnimator.SetBool(jumpVar, !isGrounded);
+        }
     }
 
     private void OnTriggerEnter2D(Collider2D collision)
@@ -367,13 +312,10 @@ public class PlayerController : MonoBehaviour
             myLevelLoader.LoadNextScene();
         }
     }
-
+    
     private void Flip()
     {
-        // Switch the way the player is labelled as facing.
         isFacingRight = !isFacingRight;
-
-        // Multiply the player's x local scale by -1.
         Vector3 bodyScale = transform.localScale;
         bodyScale.x *= -1;
         transform.localScale = bodyScale;

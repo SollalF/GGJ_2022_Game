@@ -754,6 +754,7 @@ GameObject:
   - component: {fileID: 3418789564567539108}
   - component: {fileID: 3418789564567539106}
   - component: {fileID: 3141405533265154506}
+  - component: {fileID: 7545858889344228118}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -798,15 +799,12 @@ MonoBehaviour:
   dashSpeed: 7
   dashDistance: 2.8
   dashCooldown: 0.5
-  jumpCooldown: 0.25
-  switchCooldown: 1
   horizontalMovementSmoothingFactor: 0.05
   peekingOpacity: 0.5
   spawnPoint: {fileID: 0}
   tovWorld: {fileID: 0}
   raWorld: {fileID: 0}
-  isGrounded: 0
-  horizontalInput: 0
+  isGrounded: 1
   myDownCollider2D: {fileID: 2826095390796450733}
   myUpCollider2D: {fileID: 2858605268259381500}
   myBackCollider2D: {fileID: 723875719331202024}
@@ -849,6 +847,68 @@ CapsuleCollider2D:
   m_Offset: {x: 0, y: 0.02363038}
   m_Size: {x: 0.6, y: 1.2}
   m_Direction: 0
+--- !u!114 &7545858889344228118
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3418789564567539110}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 62899f850307741f2a39c98a8b639597, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Actions: {fileID: -944628639613478452, guid: bb0280e465b63a8448f86ebb266b3a49, type: 3}
+  m_NotificationBehavior: 3
+  m_UIInputModule: {fileID: 0}
+  m_DeviceLostEvent:
+    m_PersistentCalls:
+      m_Calls: []
+  m_DeviceRegainedEvent:
+    m_PersistentCalls:
+      m_Calls: []
+  m_ControlsChangedEvent:
+    m_PersistentCalls:
+      m_Calls: []
+  m_ActionEvents:
+  - m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 3418789564567539108}
+        m_TargetAssemblyTypeName: PlayerController, Assembly-CSharp
+        m_MethodName: OnHorizontalMove
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+    m_ActionId: 961dcc21-7fce-42d4-adbc-bc322035590c
+    m_ActionName: Player/Horizontal Move[/Keyboard/leftArrow,/Keyboard/rightArrow,/Keyboard/a,/Keyboard/d]
+  - m_PersistentCalls:
+      m_Calls: []
+    m_ActionId: 16717c39-90b5-4b10-8b24-4502b99478aa
+    m_ActionName: Player/Jump[/Keyboard/space,/Keyboard/upArrow,/Keyboard/w]
+  - m_PersistentCalls:
+      m_Calls: []
+    m_ActionId: 73b74ea0-874e-456f-be54-956f58aac0ca
+    m_ActionName: Player/Dash[/Keyboard/leftShift]
+  - m_PersistentCalls:
+      m_Calls: []
+    m_ActionId: 8cfa306b-c906-4813-9535-36f2270d3c71
+    m_ActionName: Player/Switch[/Keyboard/e]
+  - m_PersistentCalls:
+      m_Calls: []
+    m_ActionId: 7055ed4a-4d64-4903-a131-5db33ea7d021
+    m_ActionName: Player/Peek[/Keyboard/leftCtrl]
+  m_NeverAutoSwitchControlSchemes: 0
+  m_DefaultControlScheme: Keyboard & Mouse
+  m_DefaultActionMap: Player
+  m_SplitScreenIndex: -1
+  m_Camera: {fileID: 0}
 --- !u!1 &3471298159069661006
 GameObject:
   m_ObjectHideFlags: 0
@@ -1043,7 +1103,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5372862056648002594}
   m_LocalRotation: {x: 0, y: -0, z: -0.99090767, w: 0.13454384}
-  m_LocalPosition: {x: -74.48508, y: -133.56819, z: 0.6666667}
+  m_LocalPosition: {x: -74.48508, y: -133.56819, z: 0}
   m_LocalScale: {x: 0.9999999, y: 0.9999999, z: 1}
   m_Children:
   - {fileID: 914011300390948919}
@@ -1161,7 +1221,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6597599913335784869}
   m_LocalRotation: {x: 0, y: 0, z: -0.044119257, w: 0.9990263}
-  m_LocalPosition: {x: 86.90291, y: -1.657082, z: 0.6666667}
+  m_LocalPosition: {x: 86.90291, y: -1.657082, z: 0}
   m_LocalScale: {x: 0.99999964, y: 0.99999964, z: 1}
   m_Children:
   - {fileID: 3611701474576601305}
@@ -1192,7 +1252,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6608322515618770561}
   m_LocalRotation: {x: 0, y: 0, z: 0.0038067934, w: 0.9999928}
-  m_LocalPosition: {x: 118.98429, y: 0.000025151467, z: 0.6666667}
+  m_LocalPosition: {x: 118.98429, y: 0.000025151467, z: 0}
   m_LocalScale: {x: 1.0000001, y: 1.0000001, z: 1}
   m_Children: []
   m_Father: {fileID: 914011300390948919}
@@ -1311,8 +1371,8 @@ MonoBehaviour:
   - {fileID: 350119453980980846}
   - {fileID: 175395506662540523}
   m_Bounds:
-    m_Center: {x: -0.1281128, y: 49.076538, z: 1}
-    m_Extent: {x: 601.4617, y: 724.4065, z: 1}
+    m_Center: {x: -0.1281128, y: 49.076477, z: 0}
+    m_Extent: {x: 601.4617, y: 724.4065, z: 0}
   m_UseBatching: 1
   m_AlwaysUpdate: 1
 --- !u!1 &7426140294898755442
