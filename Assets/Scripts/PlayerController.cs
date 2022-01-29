@@ -14,6 +14,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] float horizontalMovementSmoothingFactor = .05f;
     [SerializeField] float peekingOpacity = .5f;
     [SerializeField] Transform spawnPoint;
+    [SerializeField] float deathDelay = 3f;
 
     [SerializeField] GameObject tovWorld;
     [SerializeField] GameObject raWorld;
@@ -21,13 +22,11 @@ public class PlayerController : MonoBehaviour
     // Tags
     private string groundLayerName = "Ground";
     private string damageLayerTag = "Damage";
-    private string tovSideTag = "TovSide";
-    private string raSideTag = "RaSide";
     private string finishTag = "Finish";
     private string runVar = "isRunning";
     private string dashVar = "isDashing";
     private string jumpVar = "isJumping";
-    private string dieVar = "dieTrigger";
+    private string dieVar = "isDead";
     private string grabVar = "isGrabbing";
 
     // Status variables
@@ -81,6 +80,11 @@ public class PlayerController : MonoBehaviour
 
     private void OnDisable()
     {
+        horizontalInput.Disable();
+        myInputMaster.Player.Jump.Disable();
+        myInputMaster.Player.Dash.Disable();
+        myInputMaster.Player.Switch.Disable();
+        myInputMaster.Player.Peek.Disable();
         myInputMaster.Disable();
     }
 
@@ -283,7 +287,7 @@ public class PlayerController : MonoBehaviour
     {
         if (collision.collider.gameObject.layer == LayerMask.NameToLayer(damageLayerTag))
         {
-            transform.position = spawnPoint.position;
+            StartCoroutine(PlayerDeath());
         }
 
         if (collision.collider.gameObject.layer == LayerMask.NameToLayer(groundLayerName))
@@ -292,6 +296,19 @@ public class PlayerController : MonoBehaviour
             myAnimator.SetBool(jumpVar, !isGrounded);
         }
 
+    }
+
+    private IEnumerator PlayerDeath()
+    {
+        myInputMaster.Disable();
+        myAnimator.SetBool(dieVar, true);
+        yield return new WaitForSeconds(deathDelay);
+        SpriteRenderer spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        spriteRenderer.enabled = false;
+        myAnimator.SetBool(dieVar, false);
+        transform.position = spawnPoint.position;
+        spriteRenderer.enabled = true;
+        myInputMaster.Enable();
     }
 
     private void OnCollisionExit2D(Collision2D collision)

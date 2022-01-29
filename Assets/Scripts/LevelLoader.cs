@@ -6,10 +6,16 @@ using UnityEngine.SceneManagement;
 public class LevelLoader : MonoBehaviour
 {
     LevelLoader myLevelLoader;
+    [SerializeField] int firstLevelOffset = 0;
 
     public void LoadNextScene()
     {
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
+    }
+
+    public void LoadLevel(int level)
+    {
+        SceneManager.LoadScene(level + firstLevelOffset);
     }
 
     public void LoadMainMenu()
