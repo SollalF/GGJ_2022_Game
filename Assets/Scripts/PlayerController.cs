@@ -29,6 +29,12 @@ public class PlayerController : MonoBehaviour
     private string damageLayerTag = "Damage";
     private string tovSideTag = "TovSide";
     private string raSideTag = "RaSide";
+    private string finishTag = "Finish";
+    private string runVar = "isRunning";
+    private string dashVar = "isDashing";
+    private string jumpVar = "isJumping";
+    private string dieVar = "dieTrigger";
+    private string grabVar = "isGrabbing";
 
     // Status variables
     [SerializeField] bool isGrounded = false;
@@ -40,25 +46,27 @@ public class PlayerController : MonoBehaviour
     private float curDashCooldown;
     private float curJumpCooldown;
     private float dashProgress;
+    private bool isFacingRight = true;
     private Vector3 dashStart;
     private Vector3 dashHeading;
-    private float horizontalInput;
+    public float horizontalInput;
     private Vector3 curVelocity;
 
 
     // Cache variables
     Rigidbody2D myRigidbody2D;
+    LevelLoader myLevelLoader;
+    Animator myAnimator;
     [SerializeField] BoxCollider2D myDownCollider2D;
     [SerializeField] BoxCollider2D myUpCollider2D;
-    [SerializeField] BoxCollider2D myLeftCollider2D;
-    [SerializeField] BoxCollider2D myRightCollider2D;
-    [SerializeField] BoxCollider2D myNonFeetCollider2D;
-
-    // Debug variables
-    public float horizontalVelocityDiff;
+    [SerializeField] BoxCollider2D myBackCollider2D;
+    [SerializeField] BoxCollider2D myFrontCollider2D;
+    [SerializeField] CapsuleCollider2D mySmallCollider2D;
 
     private void Start()
     {
+        myAnimator = GetComponentInChildren<Animator>();
+        myLevelLoader = FindObjectOfType<LevelLoader>();
         myRigidbody2D = GetComponent<Rigidbody2D>();
         Switch();
     }
@@ -66,13 +74,16 @@ public class PlayerController : MonoBehaviour
     private void Update()
     {
         ProcessMovements();
+
+        // TODO move this outside of update
+        myAnimator.SetBool(jumpVar, !isGrounded);
     }
 
     private void ProcessMovements()
     {
         ProcessJump();
 
-        ProcessHorizontalMovement();
+        ProcessHorizontalInput();
 
         ProcessPeek();
 
@@ -113,6 +124,7 @@ public class PlayerController : MonoBehaviour
         {
             if (Input.GetAxisRaw(fire2AxisName) != 0)
             {
+                myAnimator.SetBool(dashVar, true);
                 usedDash = !usedDash;
                 dashProgress = 0;
                 curDashCooldown = dashCooldown;
@@ -128,6 +140,7 @@ public class PlayerController : MonoBehaviour
             {
                 if (curDashCooldown == dashCooldown)
                 {
+                    myAnimator.SetBool(dashVar, false);
                     myRigidbody2D.velocity = dashHeading * dashSpeed;
                     Debug.DrawRay(transform.position, dashHeading, Color.green, 10f);
                 }
@@ -196,40 +209,24 @@ public class PlayerController : MonoBehaviour
                         ContactFilter2D contactFilter2D = new ContactFilter2D();
                         contactFilter2D.SetLayerMask(LayerMask.GetMask(groundLayerName));
 
-                        Collider2D[] mainColliderHits = new Collider2D[4];
+                        Collider2D[] smallColliderHits = new Collider2D[4];
 
-                        myRigidbody2D.OverlapCollider(contactFilter2D, mainColliderHits);
+                        mySmallCollider2D.OverlapCollider(contactFilter2D, smallColliderHits);
 
                         bool collision = false;
 
-                        foreach (Collider2D mainHit in mainColliderHits)
+                        foreach (Collider2D Hit in smallColliderHits)
                         {
 
-                            if (mainHit == null)
+                            if (Hit == null)
                             {
                                 break;
                             }
 
-                            if (mainHit.gameObject.Equals(child.gameObject))
+                            if (Hit.gameObject.Equals(child.gameObject))
                             {
 
-                                Collider2D[] nonFeetColliderHits = new Collider2D[4];
-
-                                myNonFeetCollider2D.OverlapCollider(contactFilter2D, nonFeetColliderHits);
-
-                                foreach (Collider2D nonFeetHit in nonFeetColliderHits)
-                                {
-                                    if (nonFeetHit == null)
-                                    {
-                                        break;
-                                    }
-                                    else if (nonFeetHit.gameObject.Equals(child.gameObject))
-                                    {
-                                        Debug.Log("Collided with: " + nonFeetHit.gameObject);
-                                        collision = true;
-                                        break;
-                                    }
-                                }
+                                collision = true;
                                 
                             }
                         }
@@ -293,24 +290,17 @@ public class PlayerController : MonoBehaviour
                 if (myDownCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)))
                 {
                     myRigidbody2D.AddForce(new Vector3(0, jumpForce));
-                    Debug.Log("Vertical jump " + myRigidbody2D.velocity);
                 }
-                else if (myLeftCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)))
+                else if (myFrontCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)))
                 {
                     myRigidbody2D.velocity = new Vector3(0, myRigidbody2D.velocity.y);
-                    myRigidbody2D.AddForce(new Vector3(jumpForce * Mathf.Sin(Mathf.PI * 0.25f), jumpForce * Mathf.Cos(Mathf.PI * 0.25f)));
-                    Debug.Log("Right jump " + myRigidbody2D.velocity);
-                }
-                else if (myRightCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)))
-                {
-                    myRigidbody2D.velocity = new Vector3(0, myRigidbody2D.velocity.y);
-                    myRigidbody2D.AddForce(new Vector3(jumpForce * Mathf.Sin(Mathf.PI * -0.25f), jumpForce * Mathf.Cos(Mathf.PI * -0.25f)));
-                    Debug.Log("Left jump" + myRigidbody2D.velocity);
+                    myRigidbody2D.AddForce(new Vector3(jumpForce * Mathf.Sin(Mathf.PI * (isFacingRight ? -0.25f : 0.25f)), jumpForce * Mathf.Cos(Mathf.PI * (isFacingRight ? -0.25f : 0.25f))));
                 }
                 else if (myUpCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)))
                 {
                     myRigidbody2D.gravityScale = 1;
                 }
+
                 curJumpCooldown = jumpCooldown;
             }
         }
@@ -320,25 +310,35 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    private void ProcessHorizontalMovement()
+    private void ProcessHorizontalInput()
     {
         horizontalInput = Input.GetAxis(horizontalInputName);
-        if (isGrounded && !myDownCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName))
-                && (((myRightCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)) && horizontalInput == 1))
-                    || (myLeftCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)) && horizontalInput == -1)
-                    || (myUpCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)) && Input.GetAxisRaw(verticalInputName) == 1)))
+        if (isGrounded && !myDownCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)) && myFrontCollider2D.IsTouchingLayers(LayerMask.GetMask(groundLayerName)))
         {
+            myAnimator.SetBool(grabVar, true);
             myRigidbody2D.velocity = Vector3.zero;
             myRigidbody2D.gravityScale = 0;
         }
-        else if (horizontalInput != 0 && curJumpCooldown <= 0)
+        else if (horizontalInput != 0)
         {
+            myAnimator.SetBool(grabVar, false);
+            myAnimator.SetBool(runVar, true);
             myRigidbody2D.gravityScale = 1;
             myRigidbody2D.velocity = Vector3.SmoothDamp(myRigidbody2D.velocity, new Vector3(horizontalInput * runSpeed, myRigidbody2D.velocity.y), ref curVelocity, horizontalMovementSmoothingFactor);
         }
         else
         {
+            myAnimator.SetBool(grabVar, false);
+            myAnimator.SetBool(runVar, false);
             myRigidbody2D.gravityScale = 1;
+        }
+        if (horizontalInput > 0 && !isFacingRight)
+        {
+            Flip();
+        }
+        else if (horizontalInput < 0 && isFacingRight)
+        {
+            Flip();
         }
     }
 
@@ -362,6 +362,20 @@ public class PlayerController : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
+        if(collision.gameObject.tag == finishTag)
+        {
+            myLevelLoader.LoadNextScene();
+        }
+    }
 
+    private void Flip()
+    {
+        // Switch the way the player is labelled as facing.
+        isFacingRight = !isFacingRight;
+
+        // Multiply the player's x local scale by -1.
+        Vector3 bodyScale = transform.localScale;
+        bodyScale.x *= -1;
+        transform.localScale = bodyScale;
     }
 }
