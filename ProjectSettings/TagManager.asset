@@ -6,6 +6,7 @@ TagManager:
   tags:
   - TovSide
   - RaSide
+  - Background
   layers:
   - Default
   - TransparentFX

@@ -4,20 +4,25 @@ using UnityEngine;
 
 public class Singleton : MonoBehaviour
 {
-    private static Singleton _instance;
-
-    public static Singleton Instance { get { return _instance; } }
-
+    static Singleton instance;
 
     private void Awake()
     {
-        if (_instance != null && _instance != this)
+        if (instance != null)
         {
-            Destroy(this.gameObject);
+            gameObject.SetActive(false);
+            Destroy(gameObject);
         }
         else
         {
-            _instance = this;
+            instance = this;
+            DontDestroyOnLoad(gameObject);
         }
+    }
+
+    // Terrible code fr
+    private void Update()
+    {
+        GetComponent<AudioSource>().volume = GameState.masterVolume;
     }
 }

@@ -11,7 +11,8 @@ public class PlayerController : MonoBehaviour
     [SerializeField] float dashSpeed = 1.0f;
     [SerializeField] float dashDistance = 1.0f;
     [SerializeField] float dashCooldown = 1.0f;
-    [SerializeField] float horizontalMovementSmoothingFactor = .05f;
+    [SerializeField] float groundMovementSmoothingFactor = .05f;
+    [SerializeField] float airMovementSmoothingFactor = .05f;
     [SerializeField] float peekingOpacity = .5f;
     [SerializeField] Transform spawnPoint;
     [SerializeField] float deathDelay = 3f;
@@ -35,6 +36,7 @@ public class PlayerController : MonoBehaviour
     
     private bool usedDash = false;
     private bool isPeeking = false;
+    private bool isGamePaused = false;
 
     private float nextDashAvaliable = -1f;
     private float nextJumpAvaliable = -1f;
@@ -49,6 +51,8 @@ public class PlayerController : MonoBehaviour
     LevelLoader myLevelLoader;
     Animator myAnimator;
     InputMaster myInputMaster;
+    SFXPlayer mySFXPlayer;
+    [SerializeField] Canvas pauseCanvas;
     [SerializeField] BoxCollider2D myDownCollider2D;
     [SerializeField] BoxCollider2D myUpCollider2D;
     [SerializeField] BoxCollider2D myBackCollider2D;
@@ -76,6 +80,9 @@ public class PlayerController : MonoBehaviour
         
         myInputMaster.Player.Peek.performed += ctx => ProcessPeek();
         myInputMaster.Player.Peek.Enable();
+
+        myInputMaster.Player.Pause.performed += ctx => PauseGame();
+        myInputMaster.Player.Pause.Enable();
     }
 
     private void OnDisable()
@@ -85,11 +92,13 @@ public class PlayerController : MonoBehaviour
         myInputMaster.Player.Dash.Disable();
         myInputMaster.Player.Switch.Disable();
         myInputMaster.Player.Peek.Disable();
+        myInputMaster.Player.Pause.Disable();
         myInputMaster.Disable();
     }
 
     private void Start()
     {
+        mySFXPlayer = GetComponent<SFXPlayer>();
         myAnimator = GetComponentInChildren<Animator>();
         myLevelLoader = FindObjectOfType<LevelLoader>();
         myRigidbody2D = GetComponent<Rigidbody2D>();
@@ -123,6 +132,8 @@ public class PlayerController : MonoBehaviour
     private IEnumerator Dash()
     {
         myAnimator.SetBool(dashVar, true);
+
+        mySFXPlayer.PlayDashSFX();
 
         nextDashAvaliable = Time.time + dashDistance / dashSpeed + dashCooldown;
         
@@ -160,6 +171,15 @@ public class PlayerController : MonoBehaviour
             StartCoroutine(Dash());
         }
     }
+
+    public void PauseGame()
+    {
+        Debug.Log("Pausing : " + !isGamePaused);
+        isGamePaused = !isGamePaused;
+        Time.timeScale = isGamePaused ? 0 : 1;
+        pauseCanvas.gameObject.SetActive(isGamePaused);
+    }
+
     private void ProcessSwitch()
     {
         foreach (Transform child in isTovSide ? raWorld.transform : tovWorld.transform)
@@ -205,6 +225,8 @@ public class PlayerController : MonoBehaviour
     
     private void Switch()
     {
+        GameState.numberOfSwitchesThisGame++;
+        mySFXPlayer.PlaySwitchSFX();
         isPeeking = false;
         isTovSide = !isTovSide;
         foreach (Transform child in tovWorld.transform)
@@ -212,9 +234,14 @@ public class PlayerController : MonoBehaviour
             Color newColor = child.GetComponent<Tilemap>().color;
             newColor.a = isTovSide ? 1 : 0;
             child.GetComponent<Tilemap>().color = newColor;
+
             if (child.gameObject.layer == LayerMask.NameToLayer(groundLayerName) || child.gameObject.layer == LayerMask.NameToLayer(damageLayerTag))
             {
                 child.GetComponent<TilemapCollider2D>().enabled = isTovSide;
+            }
+            else
+            {
+                child.GetComponentInChildren<SpriteRenderer>().color = newColor;
             }
         }
         foreach (Transform child in raWorld.transform)
@@ -225,6 +252,10 @@ public class PlayerController : MonoBehaviour
             if (child.gameObject.layer == LayerMask.NameToLayer(groundLayerName) || child.gameObject.layer == LayerMask.NameToLayer(damageLayerTag))
             {
                 child.GetComponent<TilemapCollider2D>().enabled = !isTovSide;
+            }
+            else
+            {
+                child.GetComponentInChildren<SpriteRenderer>().color = newColor;
             }
         }
     }
@@ -258,17 +289,18 @@ public class PlayerController : MonoBehaviour
             myAnimator.SetBool(grabVar, false);
             myAnimator.SetBool(runVar, true);
             myRigidbody2D.gravityScale = 1;
-            myRigidbody2D.velocity = Vector3.SmoothDamp(myRigidbody2D.velocity, new Vector3(input * runSpeed, myRigidbody2D.velocity.y), ref curVelocity, horizontalMovementSmoothingFactor);
+            myRigidbody2D.velocity = Vector3.SmoothDamp(myRigidbody2D.velocity, new Vector3(input * runSpeed, myRigidbody2D.velocity.y), ref curVelocity, groundMovementSmoothingFactor);
         }
         else if (isGrounded)
         {
-            myRigidbody2D.velocity = Vector3.SmoothDamp(myRigidbody2D.velocity, new Vector3( 0 , myRigidbody2D.velocity.y), ref curVelocity, horizontalMovementSmoothingFactor);
+            myRigidbody2D.velocity = Vector3.SmoothDamp(myRigidbody2D.velocity, new Vector3(0, myRigidbody2D.velocity.y), ref curVelocity, groundMovementSmoothingFactor);
             myAnimator.SetBool(grabVar, false);
             myAnimator.SetBool(runVar, false);
             myRigidbody2D.gravityScale = 1;
         }
         else
         {
+            myRigidbody2D.velocity = Vector3.SmoothDamp(myRigidbody2D.velocity, new Vector3(0, myRigidbody2D.velocity.y), ref curVelocity, airMovementSmoothingFactor);
             myAnimator.SetBool(grabVar, false);
             myAnimator.SetBool(runVar, false);
             myRigidbody2D.gravityScale = 1;
@@ -285,11 +317,6 @@ public class PlayerController : MonoBehaviour
     
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        if (collision.collider.gameObject.layer == LayerMask.NameToLayer(damageLayerTag))
-        {
-            StartCoroutine(PlayerDeath());
-        }
-
         if (collision.collider.gameObject.layer == LayerMask.NameToLayer(groundLayerName))
         {
             isGrounded = true;
@@ -300,6 +327,8 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator PlayerDeath()
     {
+        GameState.numberOfDeathsThisGame++;
+        myRigidbody2D.velocity = Vector2.zero;
         myInputMaster.Disable();
         myAnimator.SetBool(dieVar, true);
         yield return new WaitForSeconds(deathDelay);
@@ -324,7 +353,12 @@ public class PlayerController : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        if(collision.gameObject.tag == finishTag)
+        if (collision.gameObject.layer == LayerMask.NameToLayer(damageLayerTag))
+        {
+            StartCoroutine(PlayerDeath());
+        }
+
+        if (collision.gameObject.tag == finishTag)
         {
             myLevelLoader.LoadNextScene();
         }

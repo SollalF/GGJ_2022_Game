@@ -20,6 +20,7 @@ public class LevelLoader : MonoBehaviour
 
     public void LoadMainMenu()
     {
+        GameState.ResetGame();
         SceneManager.LoadScene(0);
     }
 
